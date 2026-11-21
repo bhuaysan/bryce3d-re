@@ -40,9 +40,10 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 
 ### Phase 0 – Setup & Extraktion (≈ 1 Abend)
 - [x] Git-Repo `bryce3d-re` (öffentlich, GPL-3.0) mit `.gitignore` für ISO, extrahierte Binaries, Assets und Dekompilat (**nie committen/veröffentlichen** – urheberrechtlich geschützt).
-- [ ] `sudo dnf install unshield wine` → `unshield -d extracted/win x data.1` (ggf. `data.1` → `data1.cab` umbenennen).
+- [x] Windows-Dateien entpacken: `data.1` ist InstallShield **3** (unshield kann das nicht) → eigenes Tool `python3 -I tools/is3extract.py extract data.1 extracted/win`.
 - [ ] Optional Mac-Seite: HFS lesen (`hfsutils` oder Python `machfs`), Installer VISE entpacken (schwierig – Fallback: Installation in einem Mac-OS-9-Emulator wie SheepShaver/QEMU-PPC).
-- [ ] REA einrichten: `npx rea-agents setup` (MCP-Server für Claude Code registrieren), Ghidra-Provider auf `~/Tools/ghidra` zeigen lassen, `binary_session({})` zum Check.
+- [x] REA als MCP-Server verbunden; PE-Import/Export-Inventar erstellt (siehe [docs/findings.md](docs/findings.md)).
+- [ ] Ghidra auf ≥ 12.2 aktualisieren (REA lehnt 12.1.4 ab).
 - [ ] Ghidra-Projekt mit `Bryce 3D.exe` + allen DLLs anlegen; Analyzer „Microsoft RTTI“ / „Demangler“ aktivieren.
 
 ### Phase 1 – Baseline unter Wine (≈ 1 Woche)
