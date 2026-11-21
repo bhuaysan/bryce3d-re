@@ -81,6 +81,21 @@ Details in [formats/axiom-cmf.md](formats/axiom-cmf.md) §6.1–6.7. Evidence: E
 - [beobachtet] Die erste Ghidra-Analyse der EXE über MCP überschritt das Zeitlimit des Clients. Abhilfe: einmal per REA-CLI mit `REA_GHIDRA_CHECKPOINT_DIR` analysieren (`rea function <exe> --procedure …`, ~4 min). Danach öffnet MCP sofort aus dem Checkpoint.
 - [offen] Lichter, Terrain, Dreiecksnetz, Pfad, Material, Textur, Himmel, Sonne, `brycedocset`, Key-Wertformate und die mit [offen] markierten Felder. Unklar ist auch, was `.brc` ist.
 
+### Material und Textur (2026-11-21)
+
+Details in [formats/axiom-cmf.md](formats/axiom-cmf.md) §6.7–6.8. Evidence: EXE `xrefs`/`search_bytes` auf die Klassennamen-Zeichenkette und FourCC-Getter (`ev_af686598…`, `ev_86827f51…`, `ev_590dc0f1…`), Leser per Disassembly.
+
+- [beobachtet] Die vtable-Methoden von Material (Basis 0x6296f8) und Textur (Slot +0x28 bei 0x5a1120) hat Ghidra nicht als Funktionen angelegt, deshalb fehlen sie im Dekompilat. Zugang: Zeichenkette `C3dBaseMaterial` → Tabelle der Typnamen → Getter `0x56d690` (liefert FourCC `matr`) → `search_bytes` nach dem Getter-Zeiger → vtable → Leser. Für solche Klassen taugt `objdump -d` auf der EXE.
+- [beobachtet] Material: Leser `0x563e60` (Basis 0x108 + 0x2c8 = 976). Layout: 5 Farbkanalblöcke à 0x38, 8 Skalarkanalblöcke à 0x28, Volumenfarbe, Brechung, 3 Halftone-Parameter, 19 Kanalidentitäten. Jeder Kanal hat bis zu 3 Texturverweise (FourCC `brtx`/`pctx` + Identität), ein Modus-Bitfeld und den Basiswert.
+- [beobachtet] Alle Texturverweise und alle belegten Kanalidentitäten aller Materialdatensätze des Korpus (PC und Mac) lösen im selben Container auf eine Ressource des erwarteten Typs auf. `br3dump.py --check` prüft das und läuft über alle 169 Dateien ohne Warnung.
+- [abgeleitet] Die Reihenfolge der 19 Kanäle und der Kanalblöcke folgt den `Mat_e*`-Typen, auf die die Identitäten zeigen. Bestätigt durch die Keywerte der Kanäle und die Presets (Gold: Metallic/Reflect/Specular = 1.0).
+- [abgeleitet] Je Block liegen 12 bzw. 8 Byte Speicherreste, die Bryce beim Speichern mitschreibt (je Datei konstant, adressartig). Sie müssen beim Round-Trip erhalten, aber nicht interpretiert werden.
+- [beobachtet] Textur: Leser `0x5a1120` (Basis 0x108 + Kopf 0xEC + 0x440 = 1588). Kopf: Skalierung (3 double), Versatz (3 double), 4 `Btx_e*`-Kanalplätze. Der prozedurale Teil enthält drei gleichartige Komponentenblöcke à 0x110 Byte. Die Ganzzahlen darin wandelt der Leser mit `fild` in float.
+- [beobachtet] Texturparameter ab T (`kind`, Winkel, Farben, Modi) und die Farben, Flags und typisierten Köpfe der drei Komponentenblöcke sind dekodiert und werden mit `--check` ohne Warnung über alle 169 Dateien gelesen. Die Typen (Ganzzahl in der Datei, float im Speicher) stammen aus dem Kopierteil der Leser.
+- [abgeleitet] Die drei Komponentenblöcke sind orthogonale Vorschauansichten des Texturs (Winkel 0/90, Maßstab). Sie enthalten damit zum Teil Editorzustand, der für den Renderer unwichtig sein dürfte.
+- **Korrektur** (2026-11-21): Eine frühere Gliederung des Texturrests („T+0x384, 4 doubles“) beruhte auf Dateioffsets, die ich für T-relative gehalten hatte. Sie ist ersetzt (axiom-cmf.md §6.8).
+- [offen] Einzelfelder der Texturkomponenten und des Texturkopfs (H+0x04, H+0x08, H+0x3C, H+0x44), Bedeutung der Modus-Bits, `CPictTexture`, `C3dCImage`, Inhalt von `matprevcimage` und `CPresetDescr`.
+
 ## Wine-Baseline
 
 - [beobachtet] Wine 11.21 (Staging, WoW64), Prefix `~/.local/share/wineprefixes/bryce3d`. Die EXE startet direkt aus dem entpackten `prog/`-Ordner, **ohne Installer**.

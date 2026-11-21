@@ -155,6 +155,7 @@ class CmfFile:
                 self.warnings.append(f"free list holds {total} bytes, descriptor says {self.free_bytes}")
         self._check_coverage()
         self._parse_resources()
+        self._check_material_refs()
 
     def _check_coverage(self) -> None:
         """Every byte after the directory descriptor should belong to exactly one chunk."""
@@ -224,7 +225,8 @@ class CmfFile:
                         "size": len(payload), "aux_size": len(aux), "user": users,
                         "probe": probe_payload(payload),
                     }
-                    rec = decode_object_record(tname, payload)
+                    rec = (decode_object_record(tname, payload) or decode_material_record(tname, payload)
+                           or decode_texture_record(tname, payload))
                     if rec is None and "_e" in tname:
                         rec = decode_channel_header(payload)
                     if rec is not None:
@@ -233,6 +235,26 @@ class CmfFile:
             except CmfError as ex:
                 self.warnings.append(str(ex))
             self.types.append(t)
+
+    def _check_material_refs(self) -> None:
+        """Regression check for the material decoder: every texture reference and every
+        animation channel identity must resolve to a resource of the expected type."""
+        have = {(t["type"], r["identity"]) for t in self.types for r in t["resources"]}
+        for t in self.types:
+            for r in t["resources"]:
+                rec = r.get("record")
+                if t["type"] != "C3dBaseMaterial" or not rec:
+                    continue
+                label = f"material {r['identity']:#x}"
+                for grp in (rec["colors"], rec["scalars"]):
+                    for n, ch in grp.items():
+                        for tx in ch["tex"]:
+                            want = TEX_CLASS_TYPES.get(tx["class"])
+                            if want is None or (want, tx["id"]) not in have:
+                                self.warnings.append(f"{label}: {n} texture {tx} does not resolve")
+                for n, ident in rec["channels"].items():
+                    if (n, ident) not in have:
+                        self.warnings.append(f"{label}: channel {n} id {ident:#x} does not resolve")
 
     # ---------------- layer 3 (partial): object lists ----------------
     def _objlist_resources(self):
@@ -404,6 +426,110 @@ def decode_channel_header(d: bytes) -> dict | None:
                 return {"pc_flag": flag, "keys": n, "key_size": body // n, "extra": extra}
             return None
     return None
+
+
+# ---------------- material and texture records (docs/formats/axiom-cmf.md §6.8, §6.9) ----------------
+
+MAT_SIZE = 976               # 0x108 base + 0x2c8 material part
+MAT_COLOR_CHANNELS = ("Mat_eDiffuseC", "Mat_eAmbientC", "Mat_eSpecularC", "Mat_eSpecExp", "Mat_eTransC")
+MAT_SCALAR_CHANNELS = ("Mat_eDiffuse", "Mat_eAmbient", "Mat_eSpecular", "Mat_eTrans",
+                       "Mat_eReflect", "Mat_eBump", "Mat_eMetallic", "Mat_eHTDensity")
+# Order of the 19 animation channel identities at material offset 0x3a4 (slot -> channel).
+MAT_CHANNEL_SLOTS = ("Mat_eDiffuseC", "Mat_eAmbientC", "Mat_eSpecularC", "Mat_eSpecExp", "Mat_eTransC",
+                     "Mat_eDiffuse", "Mat_eAmbient", "Mat_eSpecular", "Mat_eTrans", "Mat_eReflect",
+                     "Mat_eBump", "Mat_eMetallic", "Mat_eHTDensity", "Mat_eMatFlags", "Mat_eVolC",
+                     "Mat_eRefract", "Mat_eHTEdge", "Mat_eHTSharp", "Mat_eHTQuality")
+TEX_CLASS_TYPES = {"brtx": "C3dTexture", "pctx": "CPictTexture"}
+TEX_SIZE = 1588              # 0x108 base + 0xec texture header + 0x440 texture part
+TEX_CHANNEL_SLOTS = ("Btx_eMapping", "Btx_eTrnScale", "Btx_eTrnOffset", "Btx_eTrnRot")
+
+
+def _texref(bo: str, d: bytes, o: int) -> dict | None:
+    """Texture reference: FourCC class (native uint32) + identity of the texture resource."""
+    fc, ident = struct.unpack_from(bo + "II", d, o)
+    if not fc and not ident:
+        return None
+    raw = struct.pack(bo + "I", fc).decode("latin-1")   # the bytes as they sit in the file
+    return {"class": raw if bo == ">" else raw[::-1], "id": ident}  # LE writers store the code reversed
+
+
+def decode_material_record(tname: str, d: bytes) -> dict | None:
+    """C3dBaseMaterial: 0x108-byte base + 0x2c8-byte material part (reader at vtable+0x28)."""
+    if tname != "C3dBaseMaterial" or len(d) != MAT_SIZE:
+        return None
+    flag = struct.unpack_from("<I", d, 0)[0]
+    if flag not in (0, 1):
+        return None
+    bo = "<" if flag == 1 else ">"
+    m = 0x108
+    version, flags = struct.unpack_from(bo + "II", d, m)
+
+    def tex3(o):
+        return [t for t in (_texref(bo, d, o + 8 * i) for i in range(3)) if t]
+
+    colors = {}
+    for k, n in enumerate(MAT_COLOR_CHANNELS):
+        o = m + 8 + 0x38 * k
+        colors[n] = {"tex": tex3(o), "mode": struct.unpack_from(bo + "I", d, o + 0x18)[0],
+                     "rgb": [round(x, 6) for x in struct.unpack_from(bo + "3f", d, o + 0x1C)]}
+    scalars = {}
+    for k, n in enumerate(MAT_SCALAR_CHANNELS):
+        o = m + 0x120 + 0x28 * k
+        scalars[n] = {"tex": tex3(o), "mode": struct.unpack_from(bo + "I", d, o + 0x18)[0],
+                      "value": round(struct.unpack_from(bo + "f", d, o + 0x1C)[0], 6)}
+    vol = struct.unpack_from(bo + "3f", d, m + 0x260)
+    refract, ht_edge, ht_sharp, ht_quality = struct.unpack_from(bo + "4f", d, m + 0x26C)
+    ids = struct.unpack_from(bo + "19I", d, m + 0x27C)
+    return {
+        "pc_flag": flag, "name": cstr(d[8:0x108]), "version": version, "mat_flags": flags,
+        "colors": colors, "scalars": scalars,
+        "vol_color": [round(x, 6) for x in vol], "refract": round(refract, 6),
+        "ht_edge": round(ht_edge, 6), "ht_sharp": round(ht_sharp, 6), "ht_quality": round(ht_quality, 6),
+        "channels": {n: i for n, i in zip(MAT_CHANNEL_SLOTS, ids) if i},
+    }
+
+
+def decode_texture_record(tname: str, d: bytes) -> dict | None:
+    """C3dTexture, partial. Decoded: the 0xec-byte header after the base, the typed
+    parameter header of the procedural part (file offset 0x1f4 on) and the fixed head of
+    its three 0x110-byte component blocks. The remaining component bytes are not yet
+    interpreted (they hold doubles, colors and flags, see the format doc)."""
+    if tname != "C3dTexture" or len(d) != TEX_SIZE:
+        return None
+    flag = struct.unpack_from("<I", d, 0)[0]
+    if flag not in (0, 1):
+        return None
+    bo = "<" if flag == 1 else ">"
+    h, t = 0x108, 0x1F4
+    u0, u1, u2 = struct.unpack_from(bo + "3I", d, h)
+    ids = struct.unpack_from(bo + "4I", d, h + 0x5C)
+    comps = []
+    for k in range(3):
+        c = t + 0x54 + 0x110 * k
+        comps.append({
+            "head": list(struct.unpack_from(bo + "3I", d, c)),
+            "ints_a": list(struct.unpack_from(bo + "5i", d, c + 0x0C)),
+            "u20": struct.unpack_from(bo + "I", d, c + 0x20)[0],
+            "ints_b": list(struct.unpack_from(bo + "6i", d, c + 0x24)),
+            "colors": [f"{x:06x}" for x in struct.unpack_from(bo + "3I", d, c + 0x54)],
+            "flags_b0": list(struct.unpack_from(bo + "2I", d, c + 0xB0)),
+            "flag_108": struct.unpack_from(bo + "I", d, c + 0x108)[0],
+        })
+    return {
+        "pc_flag": flag, "name": cstr(d[8:0x108]), "u0": u0, "u1": u1, "u2": u2,
+        "scale": list(struct.unpack_from(bo + "3d", d, h + 0x0C)),
+        "offset": list(struct.unpack_from(bo + "3d", d, h + 0x24)),
+        "channels": {n: i for n, i in zip(TEX_CHANNEL_SLOTS, ids) if i},
+        "params": {
+            "kind": list(struct.unpack_from(bo + "5I", d, t + 4)),
+            "ints_a": list(struct.unpack_from(bo + "6i", d, t + 0x18)),
+            "ints_b": list(struct.unpack_from(bo + "2I", d, t + 0x30)),
+            "floats": [round(x, 6) for x in struct.unpack_from(bo + "2f", d, t + 0x38)],
+            "modes": list(struct.unpack_from(bo + "2I", d, t + 0x40)),
+            "colors": [f"{x:06x}" for x in struct.unpack_from(bo + "3I", d, t + 0x48)],
+        },
+        "components": comps,
+    }
 
 
 def probe_payload(b: bytes) -> dict:

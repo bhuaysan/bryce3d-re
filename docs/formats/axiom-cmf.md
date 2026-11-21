@@ -1,6 +1,6 @@
 # Axiom „CCmF“ Composite File (`.br3`, `.mat`, `.obp`, `.bsk`, `.brt`, `.tme`, `Data/*.dat`)
 
-Stand: 2026-11-21. Quellen: statische Analyse von `Axiom.dll` (`CCmFile`, `CResourceEnv`, `CMasterTable`, `CResTypeTable`, `CResEntry`, `CSpoolMem`) mit Ghidra 12.2 über REA (Evidence `ev_0ce71878fb83d786…`, lokal) sowie Auswertung aller 169 CCmF-Dateien der CD und der Windows-Installation.
+Stand: 2026-11-21 (Material und Textur ergänzt). Quellen: statische Analyse von `Axiom.dll` (`CCmFile`, `CResourceEnv`, `CMasterTable`, `CResTypeTable`, `CResEntry`, `CSpoolMem`) mit Ghidra 12.2 über REA (Evidence `ev_0ce71878fb83d786…`, lokal) sowie Auswertung aller 169 CCmF-Dateien der CD und der Windows-Installation.
 Werkzeug: [`tools/br3dump.py`](../../tools/br3dump.py).
 
 Die Beschreibung ist eine eigene Formulierung. Alle Offsets sind Byte-Offsets in der Datei bzw. im Datensatz.
@@ -163,6 +163,8 @@ Quelle: statische Analyse von `Bryce 3D.exe` (REA `decompile_all` `ev_cff33f09�
 | `C3dGroupType` | `FUN_005501f0` | 640 + 4 = **644** |
 | `C3dTorusType` | `0x5b8760` | 640 + 28 = **668** |
 | `C3dBaseCamera` | `FUN_005311b0` | 640 + 168 = **808** |
+| Material (`C3dBaseMaterial`) | `0x563e60` | 0x108 + 0x2c8 = **976** (§6.7) |
+| Textur (`C3dTexture`) | `0x5a1120` (ruft `0x5c48b0`) | 0x108 + 0xEC + 0x440 = **1588** (§6.8) |
 | Lichter | `0x546850` (Würfel), `0x53beb0` (Kegel), `0x58dd40` (Pyramide), `0x54cae0` (Zylinder), `0x55df80` (Kugel), `0x5a0550` (Sonne) | [offen] |
 
 Alle Größen stimmen mit den Ressourcengrößen im Korpus überein.
@@ -238,9 +240,93 @@ Prüfregel des Lesers und im Korpus ausnahmslos erfüllt (8854 Kanäle): `Größ
 | 92 | `Obj_ePosition`, `Obj_eOrigin` |
 | 100 | `Mat_eDiffuseC`, `Mat_eAmbientC`, `Mat_eSpecularC` … |
 
-### 6.7 Noch nicht entschlüsselt
+### 6.7 Material (`C3dBaseMaterial`, 976 Byte)
 
-[offen] Lichter, Terrain (`C3dHeightField`, 2584 bis 503 672 Byte), Dreiecksnetz, Pfad, Material (976 Byte), Textur (1588), Himmel (1344), Sonne (896), `CPictTexture`, `C3dCImage` (`rle2`), `brycedocset` (DataR-Eintrag) sowie die Bedeutung der mit [offen] markierten Felder und der Key-Wertformate.
+Quelle: Leser der Materialklasse über die vtable (Basis 0x6296f8, Slot +0x28 = Leser bei `0x563e60`, Slot +0x18 = Klassennamen-Getter `0x56d690`, FourCC-Getter `matr`). Ghidra legt diese vtable-Methoden nicht als Funktionen an, sie stehen deshalb nicht im Dekompilat und wurden per Disassembly gelesen. Das PC-Flag liegt wie bei den Objekten bei Offset 0. Das Material ist 0x108 (Basis) + 0x2c8 (Materialteil) Byte groß. Der Leser tauscht jedes Feld nach seiner Breite, wenn das Flag ≠ 1 ist, und legt für die Animationskanäle ein zweites Laufzeitobjekt an (0x1ec Byte).
+
+Offsets relativ zu 0x108 („M“):
+
+| Offset | Typ | Feld |
+|---|---|---|
+| M+0x000 | u32 | Version, immer 1 |
+| M+0x004 | u32 | **Materialflags** (Laufzeitfeld 0x324). Häufig 0x10048, 0x10000, 0x48, 0. Wenn die Bits 8–10 (`& 0x700`) null sind, setzt der Leser die Halftone-Werte zurück (HTDensity 0, HTEdge 0, HTSharp 1.0, HTQuality 0.75) |
+| M+0x008 | 5 × 0x38 | **Farbkanäle**, Aufbau siehe unten, in der Reihenfolge `DiffuseC`, `AmbientC`, `SpecularC`, `SpecExp`, `TransC` |
+| M+0x120 | 8 × 0x28 | **Skalarkanäle**, in der Reihenfolge `Diffuse`, `Ambient`, `Specular`, `Trans`, `Reflect`, `Bump`, `Metallic`, `HTDensity` |
+| M+0x260 | 3 × float | Volumenfarbe (`Mat_eVolC`), Standard 1,1,1 |
+| M+0x26C | float | Brechungsindex (`Mat_eRefract`), z. B. 1.33 bei Wasser |
+| M+0x270 | float | `Mat_eHTEdge`, Standard 0 |
+| M+0x274 | float | `Mat_eHTSharp`, Standard 1.0 |
+| M+0x278 | float | `Mat_eHTQuality`, Standard 0.75 |
+| M+0x27C | 19 × u32 | Identitäten der Animationskanäle, 0 = kein Kanal (Reihenfolge unten) |
+
+**Farbkanal (0x38 Byte):**
+
+| Offset | Typ | Feld |
+|---|---|---|
+| +0x00 | 3 × (FourCC, u32) | bis zu drei **Texturverweise**: Klasse und Identität der Textur. Klasse `brtx` → Ressource `C3dTexture`, `pctx` → `CPictTexture`. 0/0 = leer. Auf dem PC stehen die Codes umgedreht (`xtrb`, `xtcp`) |
+| +0x18 | u32 | Modus, Bitfeld. Beobachtet: 0, 0x2, 0x4, 0x10000000, 0x20000000, 0x40000000, 0x80000000. [offen] Bedeutung der Bits |
+| +0x1C | 3 × float | Farbe RGB (0..1) |
+| +0x28 | 12 Byte + u32 | [abgeleitet] unbenutzt. Der Leser kopiert die Bytes, die Werte sind aber Speicherreste: je Datei konstant, in Mac-Dateien oft dieselben Adressen (z. B. `0x02adffff` in 546 Materialien) |
+
+**Skalarkanal (0x28 Byte):** wie der Farbkanal, aber nach den drei Texturverweisen (+0x00) folgen Modus (+0x18), **ein float** (+0x1C, Wert) und 8 Byte Speicherreste (+0x20).
+
+**Kanalreihenfolge der 19 Identitäten** (M+0x27C, Slot 0…18): `Mat_eDiffuseC`, `Mat_eAmbientC`, `Mat_eSpecularC`, `Mat_eSpecExp`, `Mat_eTransC`, `Mat_eDiffuse`, `Mat_eAmbient`, `Mat_eSpecular`, `Mat_eTrans`, `Mat_eReflect`, `Mat_eBump`, `Mat_eMetallic`, `Mat_eHTDensity`, `Mat_eMatFlags`, `Mat_eVolC`, `Mat_eRefract`, `Mat_eHTEdge`, `Mat_eHTSharp`, `Mat_eHTQuality`. Slot 13 (`Mat_eMatFlags`) ist in allen 1054 PC-Materialien 0. Die Zuordnung ist [abgeleitet] aus dem Typ der Ressource, auf die jede Identität zeigt (alle belegten Slots lösen auf den passenden Typ auf; Kollisionen der 32-Bit-Identitäten zwischen Typen sind Zufall) und stimmt mit den 19 Namen der EXE überein. Die Farb- und Skalarblöcke folgen derselben Reihenfolge. Das bestätigen die ersten Keys der Kanäle (Farbe und Wert stimmen mit dem Block überein) und die Presets (Gold in `Metals.mat`: Diffus gelb, Specular, Reflect und Metallic = 1.0).
+
+Querverweise: Die Identitäten der Texturverweise und Kanäle stehen im selben Container. `br3dump.py --check` prüft für jedes Material, dass alle Verweise auf eine Ressource des erwarteten Typs auflösen (alle 169 Dateien, beide Byte-Ordnungen, ohne Warnung). In `.mat`-Dateien tragen die Ressourcen `matprevcimage` (Vorschaubild) und `CPresetDescr` (Presetbeschreibung) **dieselbe Identität** wie ihr Material [beobachtet, Inhalt nicht untersucht].
+
+### 6.8 Textur (`C3dTexture`, 1588 Byte) – teilweise
+
+Quelle: Leser bei `0x5a1120` (vtable-Slot +0x28; FourCC-Getter `brtx`, `0x5b5800`), Tausch-Routinen `0x5a1700` ff. Die Beschreibung ist auf Regionenebene gesichert, die Einzelfelder der prozeduralen Teile sind größtenteils [offen]. Größe: 0x108 (Basis) + 0xEC (Texturkopf, Leser `0x5c48b0`) + 0x440 (prozeduraler Teil, Leser `0x5a1120`) = 0x634.
+
+Texturkopf (ab 0x108, „H“, 0xEC Byte):
+
+| Offset | Typ | Feld |
+|---|---|---|
+| H+0x00 | u32 | immer 1 |
+| H+0x04 | u32 | [offen] 1 (485×) oder 0, 2, 6 |
+| H+0x08 | u32 | [offen] 0 (639×) oder 1 |
+| H+0x0C | 3 × double | **Skalierung** xyz. Standard 0.1875 bzw. 0.51 |
+| H+0x24 | 3 × double | **Versatz** xyz, meist 0 |
+| H+0x3C | 8 Byte | [offen] |
+| H+0x44 | Unterstruktur | [offen], eigene Lese- und Tauschroutine (`0x5c4b40`) |
+| H+0x5C | 4 × u32 | Identitäten der Kanäle `Btx_eMapping`, `Btx_eTrnScale` (beobachtet), `Btx_eTrnOffset`, `Btx_eTrnRot` (die letzten zwei [abgeleitet], im Korpus nie belegt) |
+
+Prozeduraler Teil („T“, Dateioffset 0x1F4, 0x440 Byte). Typen aus dem Kopierteil des Lesers (`fild`/`fstp` = Ganzzahl in der Datei, float im Speicher). Offsets relativ zu T:
+
+| Offset | Typ | Feld |
+|---|---|---|
+| T+0x00 | u32 | Version 1 |
+| T+0x04 | 5 × u32 | `kind`: Werte [abgeleitet] kleine Codes. Feld 0 ∈ {1,2,3}, Feld 1 ∈ {2,3,6,7} (beobachtet), Feld 4 oft 1 oder 256 |
+| T+0x18 | 6 × int32 | in float gewandelt. Die ersten drei sind Winkel in Grad (Standard 0,45,0), die letzten drei ein Wertetripel mit gleichen Werten (140, 360, 504, 643, −43, 20 …). [offen] Bedeutung |
+| T+0x30 | 2 × u32 | Ganzzahlen |
+| T+0x38 | 2 × float | Werte, z. B. 1.278 |
+| T+0x40 | 5 × u32 | zwei Modi, dann **drei Farben** als 24-Bit-Wert (z. B. `ff0000`, `ffff00`, `0000ff`) |
+| T+0x54 | 3 × 0x110 | **drei Komponentenblöcke** (T+0x54, T+0x164, T+0x274) |
+| T+0x384 … T+0x43C | 0xB8 | Rest, [offen]: 1 u32, 7 u32, ein 72-Byte-Block (18 u32, kopiert über `0x5a1430`) mit zwei Nachzüglern, 15 u32 bei T+0x400 (kleine Ganzzahlen wie 6, 7, 3) und ein u32 bei T+0x43C |
+
+Komponentenblock (0x110 Byte, Offsets relativ zum Blockanfang). Die drei Blöcke haben dieselbe Gestalt. [abgeleitet] Sie beschreiben orthogonale Vorschauansichten des Texturs (Winkel 0/90, Maßstab 62 bzw. 100 in den Presets), also zum Teil Editorzustand:
+
+| Offset | Typ | Feld |
+|---|---|---|
+| +0x00 | 3 × u32 | Kopf. Feld 0 ∈ {1…7} |
+| +0x0C | 5 × int32 | → float. Winkel (0, 90) und Maße |
+| +0x20 | u32 | z. B. 256 |
+| +0x24 | 6 × int32 | → float |
+| +0x3C | u32 | Der Kopierer übernimmt die Bytes +0x3C bis +0xA7 unverändert |
+| +0x54 | 3 × u32 | **drei Farben** (24 Bit), beobachtet |
+| +0x60 … | doubles | 4-Byte-ausgerichtet, in der Datei bei +0x44 beginnend. Enthalten u. a. Werte wie ±62.0 und eine Matrix (±1.6597 …). Die Aufteilung in Einzelfelder ist [offen] |
+| +0xB0 | 2 × u32 | Flags 0..3 |
+| +0xB8 … +0xFF | doubles | [abgeleitet] 3×3-Matrix (9 doubles) |
+| +0x108 | u32 | Flag 0..3 |
+| +0x10C | u32 | [offen] |
+
+**Korrektur:** In der ersten Fassung dieses Abschnitts stand ein Block „T+0x384, 4 doubles“ und die Komponentenfelder waren vermischt. Die Statistik damals lief über Dateioffsets, nicht über T-relative. Die obige Aufstellung ersetzt sie.
+
+`br3dump.py` dekodiert den Texturkopf, die typisierten Parameter ab T und den Kopf, die Farben und die Flags der Komponenten. Der Rest bleibt unausgewertet.
+
+### 6.9 Noch nicht entschlüsselt
+
+[offen] Lichter, Terrain (`C3dHeightField`, 2584 bis 503 672 Byte), Dreiecksnetz, Pfad, Himmel (1344), Sonne (896), `CPictTexture`, `C3dCImage` (`rle2`), `brycedocset` (DataR-Eintrag), die Einzelfelder der Texturkomponenten und des Texturrests (§6.8), die Bedeutung der Modus-Bits der Materialkanäle sowie die Bedeutung der mit [offen] markierten Felder und der Key-Wertformate der Kanäle.
 
 ## 7. Fehlercodes von `CCmFile` (Auswahl)
 

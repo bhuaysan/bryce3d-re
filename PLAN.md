@@ -65,7 +65,9 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 - [x] Axiom-Containerformat und Ressourcenschicht spezifiziert → [docs/formats/axiom-cmf.md](docs/formats/axiom-cmf.md). Gilt für `.br3`, `.mat`, `.obp`, `.bsk`, `.brt`, `.tme` und `Data/*.dat`.
 - [x] `tools/br3dump.py` (Python-Prototyp): Container, Ressourcenbaum, Szenenhierarchie, JSON-Ausgabe. Liest alle 169 CCmF-Dateien ohne Warnung.
 - [x] Ladepfad und Byte-Order-Regel der Bryce-Datensätze; Layout von Basis-, Objekt-, Gruppen-, Torus- und Kameradatensätzen sowie Header und Keys der Animationskanäle (axiom-cmf.md §6). `br3dump.py` dekodiert sie.
-- [ ] Restliche Klassen: Lichter, Terrain, Dreiecksnetz, Pfad, Material, Textur, Himmel, Sonne, `brycedocset`, Key-Wertformate.
+- [x] Material (`C3dBaseMaterial`, 976 B) vollständig dekodiert (axiom-cmf.md §6.7), Referenzen laufen in `br3dump.py --check` über alle 169 Dateien auf.
+- [ ] Textur (`C3dTexture`, 1588 B): Gliederung und Kopf dekodiert (§6.8), prozedurale Komponenten offen.
+- [ ] Restliche Klassen: Lichter, Terrain, Dreiecksnetz, Pfad, Himmel, Sonne, `CPictTexture`, `C3dCImage`, `brycedocset`, Key-Wertformate.
 - [ ] Parser-Bibliothek `libbryce-io` (C++20 oder Rust, Entscheidung offen) nach dem Vorbild von `br3dump.py`.
 - [ ] Round-Trip-Tests gegen **alle** `.br3`-Dateien der CD (Parse → Write → Bit-Vergleich).
 - [ ] `.dat`-UI-Ressourcen und `.brt`-Texturpresets entschlüsseln.
@@ -114,7 +116,7 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 ## 7. Nächste konkrete Schritte
 
 1. **REA der Desktop-Session** läuft seit 2026-11-21 mit Ghidra 12.2 (verifiziert). Checkpoint-Verzeichnis `extracted/ghidra-checkpoints/` ist eingetragen, damit Annotationen über Sitzungen erhalten bleiben (aktiv und mit Umbenennungs-Rundlauf verifiziert).
-2. **Restliche Bryce-Datensätze**: Material (976 B) und Textur (1588 B) zuerst, weil sie für Renderer und Noise-Anwendung zentral sind. Einstieg wie bei den Objekten: Fabrik → vtable +0x28. Material und Textur laufen nicht über die Objektliste, sondern werden über die Material-Identität im Objektteil gefunden. Danach Terrain und Lichter.
+2. **Textur-Rest**: Doubles und Matrizen der Komponentenblöcke, Restbereich T+0x384–0x43C und die Bedeutung von `kind`, Winkeln und Modi. Am ehesten über die Auswertung im Renderer (Funktion, die `C3dTexture` beim Shading liest) statt über die Leser. Danach `CPictTexture`/`C3dCImage`, Terrain und Lichter. Hinweis: vtable-only-Methoden fehlen im Dekompilat (Typname → Getter → `search_bytes` → vtable, `objdump -d`).
 3. **Laufzeit-Gegenprobe Noise**: Tabellen aus dem laufenden Bryce unter Wine auslesen (winedbg) und mit `tools/bryce_math.py` vergleichen.
 4. **Höhere Noise-Funktionen** (Perlin/fBm/Turbulenz) in der EXE lokalisieren. Sie bauen auf den CMath-Bausteinen auf.
 5. Phase 1 fortsetzen: Registrierungsdialog unter Wine durchklicken, Golden Renders der 54 Szenen.
