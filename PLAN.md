@@ -68,7 +68,7 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 - [x] Material (`C3dBaseMaterial`, 976 B) vollständig dekodiert (axiom-cmf.md §6.7), Referenzen laufen in `br3dump.py --check` über alle 169 Dateien auf.
 - [ ] Textur (`C3dTexture`, 1588 B): Gliederung und Kopf dekodiert (§6.8), prozedurale Komponenten offen.
 - [ ] Restliche Klassen: Lichter, Terrain, Dreiecksnetz, Pfad, Himmel, Sonne, `CPictTexture`, `C3dCImage`, `brycedocset`, Key-Wertformate.
-- [ ] Parser-Bibliothek `libbryce-io` (Rust) nach dem Vorbild von `br3dump.py`.
+- [ ] Parser-Bibliothek `libbryce-io` (Rust) nach dem Vorbild von `br3dump.py` (Container, Ressourcen, Objektlisten, Objekt-/Material-/Textur-Records fertig, soweit dekodiert).
 - [ ] Round-Trip-Tests gegen **alle** `.br3`-Dateien der CD (Parse → Write → Bit-Vergleich).
 - [ ] `.dat`-UI-Ressourcen und `.brt`-Texturpresets entschlüsseln.
 

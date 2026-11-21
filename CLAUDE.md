@@ -37,10 +37,11 @@ Das Repo ist öffentlich. Es darf **nur eigener Code und eigene Doku** hinein:
 | `tools/is3extract.py` | InstallShield-3-Extraktor (`data.1`), inkl. PKWARE-DCL-Decoder |
 | `tools/br3dump.py` | CCmF-/`.br3`-Dumper (Baum, `--json`, `--check`, `--entries`), nur lesend |
 | `tools/bryce_math.py` | Ausführbares Referenzmodell der `CMath`-Funktionen (`selftest`, `vectors`) |
+| `crates/libbryce-io/` | Rust-Reader für CCmF/`.br3` (`cmf`, `resource`, `scene`), Binary `br3check` |
 | `Bryce3DCD.iso` | Original-CD, lokal, git-ignoriert |
 | `extracted/` | Lokal, git-ignoriert: `win/prog/` (entpackte Installation), `decomp/{axiom,exe}/` (Ghidra-Dekompilat mit Journal), `analysis/` (Export-Listen), `ghidra-checkpoints/` (REA-Checkpoints) |
 
-Nativer Code (`src/`, `libbryce-io`) existiert noch nicht. Entschieden (2026-11-21): **Rust**, native Re-Implementierung, Ziel ist die volle App (die Renderer-CLI ist Zwischenstand und Testwerkzeug). Das UI-Toolkit ist noch offen – nicht eigenmächtig festlegen, sondern nachfragen.
+Nativer Code: Cargo-Workspace, Crate `crates/libbryce-io` (Lib `bryce_io`, Binary `br3check`). Entschieden (2026-11-21): **Rust**, native Re-Implementierung, Ziel ist die volle App (die Renderer-CLI ist Zwischenstand und Testwerkzeug). Das UI-Toolkit ist noch offen – nicht eigenmächtig festlegen, sondern nachfragen.
 
 ## Befehle
 
@@ -54,6 +55,8 @@ python3 -I tools/bryce_math.py selftest extracted/win/prog/Axiom.dll
 ```
 
 Doku-Drift: `python3 -I tools/check_docs.py` am Sitzungsende ausführen, muss ohne `DRIFT` durchlaufen (prüft START.md-Form und -Aktualität, Schrittlisten in PLAN.md, Links).
+
+Rust-Reader: `cargo build --release`, dann `target/release/br3check DATEI...` – Ausgabe muss zeilengleich zu `br3dump.py --check` sein (ohne den Teil ab „, payload“).
 
 Regressionstest für Formatänderungen: `br3dump.py --check` über alle 169 CCmF-Dateien (CD + Installation) muss ohne Warnung durchlaufen.
 

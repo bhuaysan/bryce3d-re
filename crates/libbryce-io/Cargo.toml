@@ -1,0 +1,13 @@
+[package]
+name = "libbryce-io"
+description = "Reader for Bryce 3D CCmF composite files (.br3, .mat, .obp, ...)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "bryce_io"
+
+[[bin]]
+name = "br3check"
+path = "src/bin/br3check.rs"

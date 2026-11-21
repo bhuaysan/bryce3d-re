@@ -76,6 +76,17 @@ class Entry:
         return len(self.chunks) > 1 or (len(self.chunks) == 1 and self.chunks[0].capacity != self.chunks[0].length + TAG_SIZE)
 
 
+# (class, subclass) of an object-list record -> resource type of the record it names.
+# Unobserved codes (circ, pyra, ...) and unknown ones fall back to "first non-list type".
+SUBCLASS_TYPES = {
+    ("camr", "base"): "C3dBaseCamera", ("3dob", "cone"): "C3dCone", ("3dob", "cube"): "C3dCube",
+    ("3dob", "cylr"): "C3dCylinder", ("3dob", "grou"): "C3dGroupType", ("3dob", "hfld"): "C3dHeightField",
+    ("3dob", "path"): "C3dPath", ("3dob", "plne"): "C3dPlane", ("3dob", "slab"): "C3dSlab",
+    ("3dob", "sphr"): "C3dSphere", ("3dob", "sqre"): "C3dSquare", ("3dob", "tmsh"): "C3dTriMeshType2",
+    ("3dob", "toru"): "C3dTorusType", ("lght", "cone"): "C3dConeLight",
+}
+
+
 class CmfFile:
     def __init__(self, path: str):
         self.path = path
@@ -319,6 +330,9 @@ class CmfFile:
             out = []
             for cls, sub, ident, child in recs:
                 target = [x for x in by_id.get(ident, []) if x[0] != "C3dObjList"]
+                want = SUBCLASS_TYPES.get((cls, sub))
+                if want:   # identities collide between types: the subclass decides
+                    target = [x for x in target if x[0] == want]
                 node = {"class": cls, "subclass": sub, "identity": ident,
                         "type": target[0][0] if target else None,
                         "name": target[0][1]["name"] if target else None}
