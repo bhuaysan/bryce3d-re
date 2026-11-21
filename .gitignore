@@ -1,0 +1,58 @@
+# --- Original copyrighted material: NEVER commit ---
+# Disc images
+*.iso
+*.bin
+*.cue
+*.img
+*.hfs
+
+# Extracted installers / installed program files
+extracted/
+original/
+data.1
+*.cab
+*.exe
+*.EXE
+*.dll
+*.DLL
+*.dat
+*.bro
+*.bri
+*.brm
+*.brt
+*.tme
+
+# Original scenes, libraries and assets from the CD
+*.br3
+*.mat
+*.obp
+*.bsk
+*.TIF
+*.tif
+
+# Decompiler output and analysis databases (contain original code)
+ghidra/
+*.gpr
+*.rep/
+*.idb
+*.i64
+decompiled/
+rea-evidence/
+
+# Golden reference renders made with the original program
+golden/
+
+# --- Build artifacts ---
+build/
+target/
+.cache/
+compile_commands.json
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# --- Local tool settings ---
+.claude/settings.local.json
