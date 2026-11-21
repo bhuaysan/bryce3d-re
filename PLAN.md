@@ -113,11 +113,6 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 3. ~~**Sprache:**~~ → **Entschieden:** Rust.
 4. ~~**Repo:** privat oder öffentlich?~~ → **Entschieden:** öffentlich als `bryce3d-re`, GPL-3.0. Konsequenz: Im Repo landen nur eigener Code und eigene Doku. Dekompilat, Ghidra-Projekte, REA-Evidence und Golden Renders bleiben lokal (siehe `.gitignore`).
 
-## 7. Nächste konkrete Schritte
+## 7. Nächste Schritte
 
-1. **REA der Desktop-Session** läuft seit 2026-11-21 mit Ghidra 12.2 (verifiziert). Checkpoint-Verzeichnis `extracted/ghidra-checkpoints/` ist eingetragen, damit Annotationen über Sitzungen erhalten bleiben (aktiv und mit Umbenennungs-Rundlauf verifiziert).
-2. **Textur-Rest**: Doubles und Matrizen der Komponentenblöcke, Restbereich T+0x384–0x43C und die Bedeutung von `kind`, Winkeln und Modi. Am ehesten über die Auswertung im Renderer (Funktion, die `C3dTexture` beim Shading liest) statt über die Leser. Danach `CPictTexture`/`C3dCImage`, Terrain und Lichter. Hinweis: vtable-only-Methoden fehlen im Dekompilat (Typname → Getter → `search_bytes` → vtable, `objdump -d`).
-3. **Laufzeit-Gegenprobe Noise**: Tabellen aus dem laufenden Bryce unter Wine auslesen (winedbg) und mit `tools/bryce_math.py` vergleichen.
-4. **Höhere Noise-Funktionen** (Perlin/fBm/Turbulenz) in der EXE lokalisieren. Sie bauen auf den CMath-Bausteinen auf.
-5. Phase 1 fortsetzen: Registrierungsdialog unter Wine durchklicken, Golden Renders der 54 Szenen.
-6. Cargo-Workspace anlegen (`libbryce-io` als erstes Crate, Vorbild `br3dump.py`). UI-Toolkit-Entscheidung (Phase 5) vorbereiten.
+Stehen ausschließlich in [START.md](START.md). Hier bewusst keine Liste, damit nichts auseinanderläuft.

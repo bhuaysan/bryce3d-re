@@ -2,6 +2,21 @@
 
 Native Linux-Reimplementierung von **Bryce 3D** (MetaCreations, 1997) auf Basis von Reverse Engineering. Öffentliches Repo, GPL-3.0. Aktueller Stand und Phasen: [PLAN.md](PLAN.md). Befunde: [docs/findings.md](docs/findings.md).
 
+## Sitzungsablauf (Übergabe)
+
+- **Sitzungsbeginn:** zuerst [START.md](START.md) lesen (aktueller Stand und nächste Schritte).
+- **Zuständigkeit, jeder Fakt hat genau einen Ort (sonst verlinken, nicht kopieren):**
+
+| Datei | Besitzt |
+|---|---|
+| `START.md` | aktueller Stand und nächste Schritte, nichts anderes |
+| `PLAN.md` | Phasen mit Checkboxen, Entscheidungen, Risiken. Keine Schrittlisten |
+| `docs/findings.md` | Befunde mit Status beobachtet/abgeleitet/offen, Korrekturen |
+| `docs/formats/`, `docs/algorithms/` | Spezifikationen |
+| `CLAUDE.md` | Regeln, Layout, Befehle. Keinen Projektstand |
+
+- **Sitzungsende:** `START.md` aktualisieren: was erledigt ist, neuer Stand, was als Nächstes ansteht. Knapp halten, **keine Historie** (die steht in `git log` und `docs/findings.md`), erledigte Punkte entfernen statt abhaken.
+
 ## Rechtliche Grenze (wichtigste Regel)
 
 Das Repo ist öffentlich. Es darf **nur eigener Code und eigene Doku** hinein:
@@ -38,6 +53,8 @@ python3 -I tools/br3dump.py --json SZENE.br3
 python3 -I tools/bryce_math.py selftest extracted/win/prog/Axiom.dll
 ```
 
+Doku-Drift: `python3 -I tools/check_docs.py` am Sitzungsende ausführen, muss ohne `DRIFT` durchlaufen (prüft START.md-Form und -Aktualität, Schrittlisten in PLAN.md, Links).
+
 Regressionstest für Formatänderungen: `br3dump.py --check` über alle 169 CCmF-Dateien (CD + Installation) muss ohne Warnung durchlaufen.
 
 ## Konventionen
@@ -46,7 +63,7 @@ Regressionstest für Formatänderungen: `br3dump.py --check` über alle 169 CCmF
 - Jede neue Python-Datei beginnt mit `#!/usr/bin/env python3` und `# SPDX-License-Identifier: GPL-3.0-or-later`, Docstring mit Zweck und Usage.
 - Doku-Dateien beginnen mit „Stand: <Datum>“ und Quellenangabe (welche Binary, welches Werkzeug, REA-Evidence-ID gekürzt). Evidence-IDs sind lokal und nur Verweise.
 - Befunde in `findings.md` sauber als beobachtet/abgeleitet/offen kennzeichnen. Widerlegte Annahmen ausdrücklich als **Korrektur** vermerken, nicht stillschweigend löschen.
-- Nach Fortschritt Checkboxen und „Nächste konkrete Schritte“ in `PLAN.md` nachziehen.
+- Nach Fortschritt Checkboxen in `PLAN.md` nachziehen. Nächste Schritte stehen **nur** in `START.md`.
 - Ziel ist **Re-Implementierung**, kein Matching-Decomp. Erfolgskriterium: bitgenaue Formate und pixelnahe Renders gegenüber dem Original unter Wine.
 
 ## Technische Fakten, die man leicht falsch macht
