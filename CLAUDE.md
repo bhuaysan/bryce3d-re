@@ -25,7 +25,7 @@ Das Repo ist öffentlich. Es darf **nur eigener Code und eigene Doku** hinein:
 | `Bryce3DCD.iso` | Original-CD, lokal, git-ignoriert |
 | `extracted/` | Lokal, git-ignoriert: `win/prog/` (entpackte Installation), `decomp/{axiom,exe}/` (Ghidra-Dekompilat mit Journal), `analysis/` (Export-Listen), `ghidra-checkpoints/` (REA-Checkpoints) |
 
-Nativer Code (`src/`, `libbryce-io`) existiert noch nicht. Sprache (C++20 oder Rust) ist offen – nicht eigenmächtig festlegen, sondern nachfragen.
+Nativer Code (`src/`, `libbryce-io`) existiert noch nicht. Entschieden (2026-11-21): **Rust**, native Re-Implementierung, Ziel ist die volle App (die Renderer-CLI ist Zwischenstand und Testwerkzeug). Das UI-Toolkit ist noch offen – nicht eigenmächtig festlegen, sondern nachfragen.
 
 ## Befehle
 

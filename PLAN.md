@@ -68,7 +68,7 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 - [x] Material (`C3dBaseMaterial`, 976 B) vollständig dekodiert (axiom-cmf.md §6.7), Referenzen laufen in `br3dump.py --check` über alle 169 Dateien auf.
 - [ ] Textur (`C3dTexture`, 1588 B): Gliederung und Kopf dekodiert (§6.8), prozedurale Komponenten offen.
 - [ ] Restliche Klassen: Lichter, Terrain, Dreiecksnetz, Pfad, Himmel, Sonne, `CPictTexture`, `C3dCImage`, `brycedocset`, Key-Wertformate.
-- [ ] Parser-Bibliothek `libbryce-io` (C++20 oder Rust, Entscheidung offen) nach dem Vorbild von `br3dump.py`.
+- [ ] Parser-Bibliothek `libbryce-io` (Rust) nach dem Vorbild von `br3dump.py`.
 - [ ] Round-Trip-Tests gegen **alle** `.br3`-Dateien der CD (Parse → Write → Bit-Vergleich).
 - [ ] `.dat`-UI-Ressourcen und `.brt`-Texturpresets entschlüsseln.
 
@@ -96,7 +96,7 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 | Disassembly/Dekompilierung | Ghidra (`~/Tools/ghidra`, vorhanden) |
 | Agentische RE-Orchestrierung | REA (`rea-agents`, MCP-Server für Claude Code; Ghidra-Provider) |
 | Referenz-Ausführung & Tracing | Wine (+relay), ggf. `winedbg`/gdb |
-| Neu-Implementierung | C++20 + CMake (oder Rust), SDL3/Qt, OpenGL/Vulkan |
+| Neu-Implementierung | Rust (Cargo), UI-Toolkit offen (siehe Phase 5), OpenGL/Vulkan |
 | Tests | Golden-Image-Vergleich (SSIM), Round-Trip-Tests der Formate |
 
 ## 5. Risiken
@@ -108,9 +108,9 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 
 ## 6. Offene Entscheidungen
 
-1. **Ziel:** Reicht „läuft auf Fedora“ (→ Wine, fertig nach Phase 1) oder soll es wirklich eine native Re-Implementierung werden?
-2. **Umfang:** Erst Renderer-CLI (Phasen 3–4) oder direkt volle App?
-3. **Sprache:** C++20 (nah am Dekompilat) oder Rust?
+1. ~~**Ziel:**~~ → **Entschieden (2026-11-21):** native Re-Implementierung. Wine bleibt Referenz-Orakel.
+2. ~~**Umfang:**~~ → **Entschieden:** direkt die volle App. Die Renderer-CLI bleibt als Zwischenstand und Testwerkzeug (Golden-Image-Vergleich), ist aber nicht das Endziel.
+3. ~~**Sprache:**~~ → **Entschieden:** Rust.
 4. ~~**Repo:** privat oder öffentlich?~~ → **Entschieden:** öffentlich als `bryce3d-re`, GPL-3.0. Konsequenz: Im Repo landen nur eigener Code und eigene Doku. Dekompilat, Ghidra-Projekte, REA-Evidence und Golden Renders bleiben lokal (siehe `.gitignore`).
 
 ## 7. Nächste konkrete Schritte
@@ -120,4 +120,4 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 3. **Laufzeit-Gegenprobe Noise**: Tabellen aus dem laufenden Bryce unter Wine auslesen (winedbg) und mit `tools/bryce_math.py` vergleichen.
 4. **Höhere Noise-Funktionen** (Perlin/fBm/Turbulenz) in der EXE lokalisieren. Sie bauen auf den CMath-Bausteinen auf.
 5. Phase 1 fortsetzen: Registrierungsdialog unter Wine durchklicken, Golden Renders der 54 Szenen.
-6. Entscheidung **C++20 oder Rust** für `src/`.
+6. Cargo-Workspace anlegen (`libbryce-io` als erstes Crate, Vorbild `br3dump.py`). UI-Toolkit-Entscheidung (Phase 5) vorbereiten.
