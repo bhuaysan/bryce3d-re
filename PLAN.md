@@ -22,7 +22,7 @@ Laut `setup.pkg` installiert das Windows-Setup u. a.:
 - Plugins: `OBJImport.bro`, `3DSImport.bro`, `DXFImport.bro`, `3DMFImport.bro`, `PS3Export.bri`, `BMPExport.bri`, `AVIExport.brm`
 - Presets/Bibliotheken: `*.mat`, `*.obp`, `*.brt`, `*.bsk`, `*.tme` („Accel Engine“)
 
-**Erster Format-Befund `.br3`:** Header `CCmF - Universal - Axiom - AGP - Composite File Management System (Universal)`. Danach Chunks mit umgedrehten FourCC-Tags (`rmacesab` = „basecamr“, `xtrb`, `bod3…`) und Klassennamen wie `CPictTexture`. → Szenen sind **plattformübergreifend** (Mac/PC) und vermutlich ein serialisierter Objektbaum aus C++-Klassen. Im Mac-HFS-Image taucht `tC3dBaseMaterial` hundertfach auf – gute Ankerpunkte.
+**Format-Befund `.br3` (Stand 2026-11-21, Details in [docs/formats/axiom-cmf.md](docs/formats/axiom-cmf.md)):** Drei Schichten. (1) CCmF-Container: Big-Endian, Verzeichnis aus Einträgen, jeder Eintrag eine Kette von Blöcken. (2) Axiom-Ressourcenschicht: Typtabelle → Ressourcentabellen (Name, Identität, Eintragsreferenzen), ebenfalls Big-Endian. (3) Bryce-Nutzdaten in der Bytereihenfolge des schreibenden Rechners, je Ressource. Die „umgedrehten“ FourCCs (`rmacesab` = `camr`/`base` auf x86) stehen in den Objektlisten, aus denen sich der Szenenbaum rekonstruieren lässt. Ressourcentypen sind C++-Klassennamen (`C3dSphere`, `C3dBaseMaterial` …). Dasselbe Format nutzen `.mat`, `.obp`, `.bsk`, `.brt`, `.tme` und die UI-Dateien `Data/*.dat`.
 
 ## 2. Strategie
 
@@ -43,8 +43,9 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 - [x] Windows-Dateien entpacken: `data.1` ist InstallShield **3** (unshield kann das nicht) → eigenes Tool `python3 -I tools/is3extract.py extract data.1 extracted/win`.
 - [ ] Optional Mac-Seite: HFS lesen (`hfsutils` oder Python `machfs`), Installer VISE entpacken (schwierig – Fallback: Installation in einem Mac-OS-9-Emulator wie SheepShaver/QEMU-PPC).
 - [x] REA als MCP-Server verbunden; PE-Import/Export-Inventar erstellt (siehe [docs/findings.md](docs/findings.md)).
-- [ ] Ghidra auf ≥ 12.2 aktualisieren (REA lehnt 12.1.4 ab).
-- [ ] Ghidra-Projekt mit `Bryce 3D.exe` + allen DLLs anlegen; Analyzer „Microsoft RTTI“ / „Demangler“ aktivieren.
+- [x] Ghidra 12.2 lokal installiert (`~/Tools/ghidra_12.2_PUBLIC`). Der MCP-Server der Desktop-Session nutzt aber noch den 12.1.4-Symlink (siehe findings.md, Werkzeug-Status). Übergangsweise läuft die Dekompilierung über die REA-CLI.
+- [x] Volle Dekompilierung von `Axiom.dll` und `Bryce 3D.exe` (REA `decompile-all`, Ghidra 12.2) nach `extracted/decomp/` (lokal).
+- [ ] Gleiches für `amberkrn.dll` und die Plugins. Persistentes Ghidra-Projekt (REA-Checkpoint-Modus) für Annotationen.
 
 ### Phase 1 – Baseline unter Wine (≈ 1 Woche)
 - [ ] Bryce unter Wine (32-bit-Prefix, `WINEARCH=win32` bzw. WoW64) installieren und starten.
@@ -54,14 +55,18 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 
 ### Phase 2 – Statische Kartierung mit REA/Ghidra (≈ 2–3 Wochen)
 - [ ] REA `inspect_pe_imports` / `inspect_native_exports` / `inspect_pe_resources` für jede DLL/EXE → Modulkarte & Abhängigkeitsgraph.
-- [ ] RTTI/vtables auswerten → **Klassenhierarchie** (`C3dBaseMaterial`, `CPictTexture`, …) als zentrales Dokument.
+- [ ] RTTI/vtables auswerten → **Klassenhierarchie** (`C3dBaseMaterial`, `CPictTexture`, …) als zentrales Dokument. Die EXE hat keine RTTI. Klassennamen liefern die Ressourcentypen der `.br3`-Dateien (siehe axiom-cmf.md) und die FourCC-Klassencodes der Objektlisten.
+- [x] `CMath`-Noise/Zufall/Formfunktionen dokumentiert ([docs/algorithms/noise.md](docs/algorithms/noise.md)), Referenzmodell `tools/bryce_math.py`.
 - [ ] Subsysteme verorten und benennen: Datei-I/O (Axiom), Szenengraph, Raytracer-Kern, Terrain (Heightfield), prozedurale Texturen (3D-Noise), Atmosphäre/Himmel/Wolken, Materialien, Animation, UI-Framework, Plugin-ABI.
 - [ ] Mac-PPC-Binaries (falls entpackt) auf Traceback-Tabellen/Funktionsnamen prüfen und per Ghidra „Function ID“/BSim mit der x86-Version abgleichen.
 - [ ] Findings-Ledger (`docs/findings.md`) mit REA-Evidence-IDs pflegen; Ghidra-Projekt regelmäßig sichern.
 
 ### Phase 3 – Dateiformate (≈ 3–4 Wochen) · *erster nativer Meilenstein*
-- [ ] Axiom-Containerformat (`.br3` und vermutlich `.mat`, `.obp`, `.bsk`) spezifizieren → `docs/formats/axiom.md`.
-- [ ] Parser-Bibliothek `libbryce-io` (C++20 oder Rust) + `br3dump` CLI, die eine Szene als JSON ausgibt.
+- [x] Axiom-Containerformat und Ressourcenschicht spezifiziert → [docs/formats/axiom-cmf.md](docs/formats/axiom-cmf.md). Gilt für `.br3`, `.mat`, `.obp`, `.bsk`, `.brt`, `.tme` und `Data/*.dat`.
+- [x] `tools/br3dump.py` (Python-Prototyp): Container, Ressourcenbaum, Szenenhierarchie, JSON-Ausgabe. Liest alle 169 CCmF-Dateien ohne Warnung.
+- [x] Ladepfad und Byte-Order-Regel der Bryce-Datensätze; Layout von Basis-, Objekt-, Gruppen-, Torus- und Kameradatensätzen sowie Header und Keys der Animationskanäle (axiom-cmf.md §6). `br3dump.py` dekodiert sie.
+- [ ] Restliche Klassen: Lichter, Terrain, Dreiecksnetz, Pfad, Material, Textur, Himmel, Sonne, `brycedocset`, Key-Wertformate.
+- [ ] Parser-Bibliothek `libbryce-io` (C++20 oder Rust, Entscheidung offen) nach dem Vorbild von `br3dump.py`.
 - [ ] Round-Trip-Tests gegen **alle** `.br3`-Dateien der CD (Parse → Write → Bit-Vergleich).
 - [ ] `.dat`-UI-Ressourcen und `.brt`-Texturpresets entschlüsseln.
 
@@ -108,16 +113,9 @@ Grundsatz: **Re-Implementierung** (sauberer, moderner C++/Rust-Code nach dekompi
 
 ## 7. Nächste konkrete Schritte
 
-```bash
-sudo dnf install unshield wine
-```
-
-```bash
-mkdir -p extracted/win && 7z x Bryce3DCD.iso data.1 -oextracted && unshield -d extracted/win x extracted/data.1
-```
-
-```bash
-npx rea-agents setup
-```
-
-Danach: Phase 1 (Wine-Baseline) und parallel Phase 2 mit `open_binary` auf `Bryce 3D.exe`.
+1. **REA der Desktop-Session** läuft seit 2026-11-21 mit Ghidra 12.2 (verifiziert). Checkpoint-Verzeichnis `extracted/ghidra-checkpoints/` ist eingetragen, damit Annotationen über Sitzungen erhalten bleiben (aktiv und mit Umbenennungs-Rundlauf verifiziert).
+2. **Restliche Bryce-Datensätze**: Material (976 B) und Textur (1588 B) zuerst, weil sie für Renderer und Noise-Anwendung zentral sind. Einstieg wie bei den Objekten: Fabrik → vtable +0x28. Material und Textur laufen nicht über die Objektliste, sondern werden über die Material-Identität im Objektteil gefunden. Danach Terrain und Lichter.
+3. **Laufzeit-Gegenprobe Noise**: Tabellen aus dem laufenden Bryce unter Wine auslesen (winedbg) und mit `tools/bryce_math.py` vergleichen.
+4. **Höhere Noise-Funktionen** (Perlin/fBm/Turbulenz) in der EXE lokalisieren. Sie bauen auf den CMath-Bausteinen auf.
+5. Phase 1 fortsetzen: Registrierungsdialog unter Wine durchklicken, Golden Renders der 54 Szenen.
+6. Entscheidung **C++20 oder Rust** für `src/`.

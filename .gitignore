@@ -47,6 +47,7 @@ build/
 target/
 .cache/
 compile_commands.json
+__pycache__/
 
 # --- Editor / OS ---
 .vscode/
